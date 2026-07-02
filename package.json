@@ -1,0 +1,14 @@
+{
+  "name": "floating-notes",
+  "version": "0.1.0",
+  "description": "A floating desktop notes and todo app with realtime local persistence.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^22.3.27"
+  }
+}

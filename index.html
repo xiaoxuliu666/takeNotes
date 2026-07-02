@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浮窗笔记</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="titlebar">
+        <div class="drag-region">
+          <div class="app-mark">N</div>
+          <div>
+            <div class="app-title">浮窗笔记</div>
+            <div class="save-state" id="saveState">已保存</div>
+          </div>
+        </div>
+        <div class="window-actions">
+          <button class="icon-button" id="pinButton" type="button" title="切换窗口置顶" aria-label="切换窗口置顶">P</button>
+          <button class="icon-button" id="loginButton" type="button" title="切换开机自启" aria-label="切换开机自启">A</button>
+          <button class="icon-button" id="minimizeButton" type="button" title="最小化" aria-label="最小化">_</button>
+          <button class="icon-button danger" id="closeButton" type="button" title="关闭" aria-label="关闭">X</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-head">
+            <span>栏目</span>
+            <button class="icon-button small" id="addColumnButton" type="button" title="新增栏目" aria-label="新增栏目">+</button>
+          </div>
+          <div class="column-list" id="columnList"></div>
+        </aside>
+
+        <section class="content">
+          <div class="content-head">
+            <input class="column-name" id="columnNameInput" type="text" maxlength="32" aria-label="栏目名称">
+            <button class="text-button danger" id="deleteColumnButton" type="button">删除栏目</button>
+          </div>
+
+          <div class="composer">
+            <textarea id="itemTextInput" rows="3" maxlength="2000" placeholder="写笔记或待办..."></textarea>
+            <div class="composer-actions">
+              <div class="segmented" role="group" aria-label="内容类型">
+                <button id="noteModeButton" class="active" type="button">笔记</button>
+                <button id="todoModeButton" type="button">待办</button>
+              </div>
+              <button class="primary-button" id="addItemButton" type="button">添加</button>
+            </div>
+          </div>
+
+          <div class="item-list" id="itemList"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
