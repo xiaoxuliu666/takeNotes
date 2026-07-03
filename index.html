@@ -18,6 +18,7 @@
           </div>
         </div>
         <div class="window-actions">
+          <button class="icon-button" id="settingsButton" type="button" title="存储设置" aria-label="存储设置">S</button>
           <button class="icon-button" id="pinButton" type="button" title="切换窗口置顶" aria-label="切换窗口置顶">P</button>
           <button class="icon-button" id="loginButton" type="button" title="切换开机自启" aria-label="切换开机自启">A</button>
           <button class="icon-button" id="minimizeButton" type="button" title="最小化" aria-label="最小化">_</button>
@@ -38,6 +39,10 @@
           <div class="content-head">
             <input class="column-name" id="columnNameInput" type="text" maxlength="32" aria-label="栏目名称">
             <button class="text-button danger" id="deleteColumnButton" type="button">删除栏目</button>
+          </div>
+
+          <div class="search-bar">
+            <input id="searchInput" class="search-input" type="search" maxlength="100" placeholder="全局搜索笔记、待办、栏目..." aria-label="全局搜索">
           </div>
 
           <div class="partition-tabs" role="tablist" aria-label="内容分区">
@@ -62,6 +67,33 @@
           <div class="item-list" id="itemList"></div>
         </section>
       </main>
+
+      <section class="settings-panel" id="settingsPanel" hidden aria-label="存储设置">
+        <div class="settings-card">
+          <div class="settings-head">
+            <div>
+              <div class="settings-title">存储设置</div>
+              <div class="settings-subtitle">切换或迁移笔记数据文件夹</div>
+            </div>
+            <button class="icon-button" id="closeSettingsButton" type="button" title="关闭设置" aria-label="关闭设置">X</button>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-label">当前笔记文件夹</div>
+            <div class="path-box" id="currentStoragePath"></div>
+          </div>
+
+          <div class="settings-actions">
+            <button class="text-button" id="chooseStorageButton" type="button">打开文件夹并切换</button>
+            <button class="primary-button" id="migrateStorageButton" type="button">迁移到新文件夹</button>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-label">常用笔记文件夹</div>
+            <div class="folder-list" id="storageFolderList"></div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script src="./renderer.js"></script>

@@ -1,6 +1,9 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
+
+const STORE_FILE = 'notes-store.json';
+const CONFIG_FILE = 'storage-config.json';
 
 const defaultStore = {
   version: 1,
@@ -40,44 +43,139 @@ const defaultStore = {
 };
 
 let mainWindow;
-let storePath;
 
-function ensureStorePath() {
-  storePath = path.join(app.getPath('userData'), 'notes-store.json');
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
-function readStore() {
-  ensureStorePath();
+function defaultDataDir() {
+  return app.getPath('userData');
+}
 
+function configPath() {
+  return path.join(app.getPath('userData'), CONFIG_FILE);
+}
+
+function normalizeDir(dirPath) {
+  if (!dirPath || typeof dirPath !== 'string') {
+    return defaultDataDir();
+  }
+
+  return path.resolve(dirPath);
+}
+
+function normalizeConfig(config) {
+  const currentDataDir = normalizeDir(config && config.currentDataDir);
+  const rawRecent = Array.isArray(config && config.recentDataDirs) ? config.recentDataDirs : [];
+  const recentDataDirs = [currentDataDir]
+    .concat(rawRecent.map(normalizeDir))
+    .filter((dir, index, list) => list.indexOf(dir) === index)
+    .slice(0, 10);
+
+  return {
+    currentDataDir,
+    recentDataDirs
+  };
+}
+
+function readConfig() {
   try {
-    if (!fs.existsSync(storePath)) {
-      writeStore(defaultStore);
-      return defaultStore;
+    const filePath = configPath();
+    if (!fs.existsSync(filePath)) {
+      const config = normalizeConfig({ currentDataDir: defaultDataDir(), recentDataDirs: [defaultDataDir()] });
+      writeConfig(config);
+      return config;
     }
 
-    const raw = fs.readFileSync(storePath, 'utf8');
+    return normalizeConfig(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+  } catch (_) {
+    return normalizeConfig({ currentDataDir: defaultDataDir(), recentDataDirs: [defaultDataDir()] });
+  }
+}
+
+function writeConfig(config) {
+  const normalized = normalizeConfig(config);
+  const filePath = configPath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), 'utf8');
+  return normalized;
+}
+
+function updateConfig(change) {
+  const config = readConfig();
+  change(config);
+  return writeConfig(config);
+}
+
+function currentDataDir() {
+  return readConfig().currentDataDir;
+}
+
+function storePath(dataDir = currentDataDir()) {
+  return path.join(normalizeDir(dataDir), STORE_FILE);
+}
+
+function rememberDataDir(dataDir) {
+  const nextDir = normalizeDir(dataDir);
+  return updateConfig((config) => {
+    config.currentDataDir = nextDir;
+    config.recentDataDirs = [nextDir]
+      .concat(config.recentDataDirs || [])
+      .map(normalizeDir)
+      .filter((dir, index, list) => list.indexOf(dir) === index)
+      .slice(0, 10);
+  });
+}
+
+function createEmptyStore(baseStore) {
+  const base = normalizeStore(baseStore || defaultStore);
+  return {
+    version: 1,
+    settings: Object.assign({}, base.settings, { activeColumnId: 'inbox' }),
+    columns: [
+      {
+        id: 'inbox',
+        name: '默认',
+        items: []
+      }
+    ],
+    window: base.window
+  };
+}
+
+function readStore(dataDir = currentDataDir()) {
+  const filePath = storePath(dataDir);
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      writeStore(defaultStore, dataDir);
+      return normalizeStore(defaultStore);
+    }
+
+    const raw = fs.readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
     return normalizeStore(parsed);
   } catch (error) {
-    const backupPath = `${storePath}.broken-${Date.now()}`;
+    const backupPath = `${filePath}.broken-${Date.now()}`;
     try {
-      if (fs.existsSync(storePath)) {
-        fs.copyFileSync(storePath, backupPath);
+      if (fs.existsSync(filePath)) {
+        fs.copyFileSync(filePath, backupPath);
       }
     } catch (_) {
       // Best effort backup only.
     }
-    writeStore(defaultStore);
-    return defaultStore;
+    writeStore(defaultStore, dataDir);
+    return normalizeStore(defaultStore);
   }
 }
 
 function normalizeStore(store) {
-  const settings = Object.assign({}, defaultStore.settings, store.settings || {});
-  const windowState = Object.assign({}, defaultStore.window, store.window || {});
-  const columns = Array.isArray(store.columns) && store.columns.length > 0
-    ? store.columns
-    : defaultStore.columns;
+  const rawStore = store || {};
+  const settings = Object.assign({}, defaultStore.settings, rawStore.settings || {});
+  const windowState = Object.assign({}, defaultStore.window, rawStore.window || {});
+  const columns = Array.isArray(rawStore.columns) && rawStore.columns.length > 0
+    ? clone(rawStore.columns)
+    : clone(defaultStore.columns);
 
   return {
     version: 1,
@@ -87,12 +185,12 @@ function normalizeStore(store) {
   };
 }
 
-function writeStore(data) {
-  ensureStorePath();
-  fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  const tempPath = `${storePath}.tmp`;
+function writeStore(data, dataDir = currentDataDir()) {
+  const filePath = storePath(dataDir);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(normalizeStore(data), null, 2), 'utf8');
-  fs.renameSync(tempPath, storePath);
+  fs.renameSync(tempPath, filePath);
 }
 
 function applyLoginSettings(openAtLogin) {
@@ -168,7 +266,10 @@ ipcMain.handle('store:load', () => {
   const store = readStore();
   const loginSettings = app.getLoginItemSettings();
   store.settings.openAtLogin = Boolean(loginSettings.openAtLogin);
-  return store;
+  return {
+    store,
+    storage: getStorageInfo()
+  };
 });
 
 ipcMain.handle('store:save', (_event, data) => {
@@ -188,6 +289,68 @@ ipcMain.on('store:save-sync', (event, data) => {
   writeStore(normalized);
   applyLoginSettings(normalized.settings.openAtLogin);
   event.returnValue = normalized;
+});
+
+function getStorageInfo() {
+  const config = readConfig();
+  return {
+    currentDataDir: config.currentDataDir,
+    recentDataDirs: config.recentDataDirs,
+    storeFileName: STORE_FILE
+  };
+}
+
+ipcMain.handle('storage:get', () => {
+  return getStorageInfo();
+});
+
+ipcMain.handle('storage:choose-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择笔记存储文件夹',
+    properties: ['openDirectory', 'createDirectory']
+  });
+
+  if (result.canceled || !result.filePaths.length) {
+    return null;
+  }
+
+  return normalizeDir(result.filePaths[0]);
+});
+
+ipcMain.handle('storage:switch', (_event, dataDir) => {
+  const nextDir = normalizeDir(dataDir);
+  rememberDataDir(nextDir);
+  const store = readStore(nextDir);
+  const loginSettings = app.getLoginItemSettings();
+  store.settings.openAtLogin = Boolean(loginSettings.openAtLogin);
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setAlwaysOnTop(Boolean(store.settings.alwaysOnTop), 'floating');
+  }
+
+  return {
+    store,
+    storage: getStorageInfo()
+  };
+});
+
+ipcMain.handle('storage:migrate', (_event, targetDataDir) => {
+  const sourceDir = currentDataDir();
+  const targetDir = normalizeDir(targetDataDir);
+
+  if (sourceDir === targetDir) {
+    throw new Error('目标文件夹不能和当前文件夹相同');
+  }
+
+  const currentStore = readStore(sourceDir);
+  writeStore(currentStore, targetDir);
+  writeStore(createEmptyStore(currentStore), sourceDir);
+  rememberDataDir(targetDir);
+
+  return {
+    store: readStore(targetDir),
+    storage: getStorageInfo()
+  };
 });
 
 ipcMain.handle('window:minimize', () => {

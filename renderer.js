@@ -2,6 +2,7 @@ const api = window.floatingNotes;
 
 const elements = {
   saveState: document.getElementById('saveState'),
+  settingsButton: document.getElementById('settingsButton'),
   pinButton: document.getElementById('pinButton'),
   loginButton: document.getElementById('loginButton'),
   minimizeButton: document.getElementById('minimizeButton'),
@@ -10,6 +11,7 @@ const elements = {
   columnList: document.getElementById('columnList'),
   columnNameInput: document.getElementById('columnNameInput'),
   deleteColumnButton: document.getElementById('deleteColumnButton'),
+  searchInput: document.getElementById('searchInput'),
   itemTextInput: document.getElementById('itemTextInput'),
   noteModeButton: document.getElementById('noteModeButton'),
   todoModeButton: document.getElementById('todoModeButton'),
@@ -17,13 +19,21 @@ const elements = {
   todoCount: document.getElementById('todoCount'),
   composerLabel: document.getElementById('composerLabel'),
   addItemButton: document.getElementById('addItemButton'),
-  itemList: document.getElementById('itemList')
+  itemList: document.getElementById('itemList'),
+  settingsPanel: document.getElementById('settingsPanel'),
+  closeSettingsButton: document.getElementById('closeSettingsButton'),
+  currentStoragePath: document.getElementById('currentStoragePath'),
+  chooseStorageButton: document.getElementById('chooseStorageButton'),
+  migrateStorageButton: document.getElementById('migrateStorageButton'),
+  storageFolderList: document.getElementById('storageFolderList')
 };
 
 let store;
+let storageInfo;
 let currentMode = 'note';
 let saveTimer;
 let editingItemId = null;
+let highlightedItemId = null;
 
 const linkPattern = /https?:\/\/[^\s<>"']+/gi;
 
@@ -33,6 +43,85 @@ function uid(prefix) {
 
 function now() {
   return Date.now();
+}
+
+function normalizeSearchText(value) {
+  return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function fuzzyScore(query, target) {
+  const normalizedQuery = normalizeSearchText(query);
+  const normalizedTarget = normalizeSearchText(target);
+
+  if (!normalizedQuery) {
+    return 0;
+  }
+
+  if (normalizedTarget.includes(normalizedQuery)) {
+    return 100 + normalizedQuery.length;
+  }
+
+  const terms = normalizedQuery.split(' ').filter(Boolean);
+  if (terms.length > 1) {
+    let total = 0;
+    for (const term of terms) {
+      const score = fuzzyScore(term, normalizedTarget);
+      if (!score) {
+        return 0;
+      }
+      total += score;
+    }
+    return total;
+  }
+
+  let queryIndex = 0;
+  let firstMatch = -1;
+  let lastMatch = -1;
+
+  for (let targetIndex = 0; targetIndex < normalizedTarget.length && queryIndex < normalizedQuery.length; targetIndex += 1) {
+    if (normalizedTarget[targetIndex] === normalizedQuery[queryIndex]) {
+      if (firstMatch === -1) {
+        firstMatch = targetIndex;
+      }
+      lastMatch = targetIndex;
+      queryIndex += 1;
+    }
+  }
+
+  if (queryIndex !== normalizedQuery.length) {
+    return 0;
+  }
+
+  const spreadPenalty = Math.max(0, lastMatch - firstMatch - normalizedQuery.length);
+  return Math.max(1, 60 - spreadPenalty);
+}
+
+function searchItems(query) {
+  const results = [];
+
+  store.columns.forEach((column) => {
+    column.items.forEach((item) => {
+      const searchable = `${column.name || ''} ${item.type === 'todo' ? '待办' : '笔记'} ${item.text || ''}`;
+      const score = fuzzyScore(query, searchable);
+
+      if (score > 0) {
+        results.push({
+          score,
+          columnId: column.id,
+          columnName: column.name || '未命名',
+          item
+        });
+      }
+    });
+  });
+
+  return results.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+
+    return (b.item.updatedAt || 0) - (a.item.updatedAt || 0);
+  });
 }
 
 function trimLinkPunctuation(url) {
@@ -98,6 +187,19 @@ function setSaveState(text) {
   elements.saveState.textContent = text;
 }
 
+function shortPath(folderPath) {
+  if (!folderPath) {
+    return '';
+  }
+
+  const parts = folderPath.split('/').filter(Boolean);
+  if (parts.length <= 3) {
+    return folderPath;
+  }
+
+  return `.../${parts.slice(-3).join('/')}`;
+}
+
 function scheduleSave() {
   clearTimeout(saveTimer);
   setSaveState('保存中...');
@@ -118,6 +220,36 @@ function renderChrome() {
   elements.pinButton.title = store.settings.alwaysOnTop ? '已置顶，点击取消' : '未置顶，点击固定到最顶层';
   elements.loginButton.classList.toggle('active', Boolean(store.settings.openAtLogin));
   elements.loginButton.title = store.settings.openAtLogin ? '已开机自启，点击取消' : '未开机自启，点击开启';
+}
+
+function renderStorageSettings() {
+  if (!storageInfo) {
+    return;
+  }
+
+  elements.currentStoragePath.textContent = storageInfo.currentDataDir;
+  elements.currentStoragePath.title = storageInfo.currentDataDir;
+  elements.storageFolderList.innerHTML = '';
+
+  storageInfo.recentDataDirs.forEach((folderPath) => {
+    const row = document.createElement('div');
+    row.className = `folder-row${folderPath === storageInfo.currentDataDir ? ' active' : ''}`;
+
+    const pathText = document.createElement('div');
+    pathText.className = 'folder-path';
+    pathText.textContent = shortPath(folderPath);
+    pathText.title = folderPath;
+
+    const action = document.createElement('button');
+    action.className = 'text-button folder-switch-button';
+    action.type = 'button';
+    action.dataset.folderPath = folderPath;
+    action.textContent = folderPath === storageInfo.currentDataDir ? '当前' : '切换';
+    action.disabled = folderPath === storageInfo.currentDataDir;
+
+    row.append(pathText, action);
+    elements.storageFolderList.appendChild(row);
+  });
 }
 
 function renderColumns() {
@@ -143,13 +275,61 @@ function renderColumns() {
   });
 }
 
+function renderSearchResults(query) {
+  const results = searchItems(query);
+  elements.itemList.innerHTML = '';
+
+  if (!results.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = '没有找到匹配内容';
+    elements.itemList.appendChild(empty);
+    return;
+  }
+
+  results.forEach((result) => {
+    const row = document.createElement('article');
+    row.className = `search-result ${result.item.type}`;
+    row.dataset.columnId = result.columnId;
+    row.dataset.itemId = result.item.id;
+    row.dataset.itemType = result.item.type;
+
+    const meta = document.createElement('div');
+    meta.className = 'search-meta';
+
+    const type = document.createElement('span');
+    type.className = 'search-type';
+    type.textContent = result.item.type === 'todo' ? '待办' : '笔记';
+
+    const column = document.createElement('span');
+    column.className = 'search-column';
+    column.textContent = result.columnName;
+
+    meta.append(type, column);
+
+    const preview = document.createElement('div');
+    preview.className = 'search-preview';
+    appendTextWithLinks(preview, result.item.text || '');
+
+    row.append(meta, preview);
+    elements.itemList.appendChild(row);
+  });
+}
+
 function renderItems() {
   const column = activeColumn();
+  const searchQuery = elements.searchInput.value.trim();
   const visibleItems = column.items.filter((item) => item.type === currentMode);
   const sectionName = currentMode === 'todo' ? '待办' : '笔记';
 
   elements.columnNameInput.value = column.name || '';
   elements.deleteColumnButton.disabled = store.columns.length <= 1;
+
+  if (searchQuery) {
+    renderSearchResults(searchQuery);
+    return;
+  }
+
   elements.itemList.innerHTML = '';
 
   if (!visibleItems.length) {
@@ -165,7 +345,7 @@ function renderItems() {
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .forEach((item) => {
       const row = document.createElement('article');
-      row.className = `note-item ${item.type}${item.completed ? ' completed' : ''}`;
+      row.className = `note-item ${item.type}${item.completed ? ' completed' : ''}${highlightedItemId === item.id ? ' highlighted' : ''}`;
       row.dataset.itemId = item.id;
 
       if (item.type === 'todo') {
@@ -232,6 +412,7 @@ function renderMode() {
 
 function render() {
   renderChrome();
+  renderStorageSettings();
   renderMode();
   renderColumns();
   renderItems();
@@ -319,6 +500,98 @@ function enterEditMode(itemId) {
   }
 }
 
+function focusItem(itemId) {
+  const row = elements.itemList.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
+  if (!row) {
+    return;
+  }
+
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function openSearchResult(row) {
+  const itemId = row.dataset.itemId;
+  store.settings.activeColumnId = row.dataset.columnId;
+  currentMode = row.dataset.itemType;
+  editingItemId = null;
+  highlightedItemId = itemId;
+  elements.searchInput.value = '';
+  render();
+  scheduleSave();
+  setTimeout(() => focusItem(itemId), 0);
+  setTimeout(() => {
+    if (highlightedItemId === itemId) {
+      highlightedItemId = null;
+      renderItems();
+    }
+  }, 1600);
+}
+
+function applyLoadedData(payload) {
+  store = payload.store || payload;
+  storageInfo = payload.storage || storageInfo;
+  editingItemId = null;
+  highlightedItemId = null;
+  elements.searchInput.value = '';
+  currentMode = 'note';
+  render();
+}
+
+async function saveImmediately() {
+  clearTimeout(saveTimer);
+  if (store) {
+    store = await api.saveStore(store);
+  }
+}
+
+function openSettings() {
+  renderStorageSettings();
+  elements.settingsPanel.hidden = false;
+}
+
+function closeSettings() {
+  elements.settingsPanel.hidden = true;
+}
+
+async function chooseAndSwitchStorage() {
+  const folderPath = await api.chooseStorageFolder();
+  if (!folderPath) {
+    return;
+  }
+
+  await saveImmediately();
+  const payload = await api.switchStorageFolder(folderPath);
+  applyLoadedData(payload);
+  openSettings();
+  setSaveState('已切换');
+}
+
+async function migrateStorage() {
+  const folderPath = await api.chooseStorageFolder();
+  if (!folderPath) {
+    return;
+  }
+
+  const confirmed = window.confirm('迁移会把当前笔记复制到新文件夹，并清空旧文件夹里的笔记数据。继续？');
+  if (!confirmed) {
+    return;
+  }
+
+  await saveImmediately();
+  const payload = await api.migrateStorageFolder(folderPath);
+  applyLoadedData(payload);
+  openSettings();
+  setSaveState('已迁移');
+}
+
+async function switchStorage(folderPath) {
+  await saveImmediately();
+  const payload = await api.switchStorageFolder(folderPath);
+  applyLoadedData(payload);
+  openSettings();
+  setSaveState('已切换');
+}
+
 elements.pinButton.addEventListener('click', () => {
   mutate(() => {
     store.settings.alwaysOnTop = !store.settings.alwaysOnTop;
@@ -337,6 +610,40 @@ elements.minimizeButton.addEventListener('click', () => {
 
 elements.closeButton.addEventListener('click', () => {
   api.close();
+});
+
+elements.settingsButton.addEventListener('click', openSettings);
+elements.closeSettingsButton.addEventListener('click', closeSettings);
+elements.chooseStorageButton.addEventListener('click', () => {
+  chooseAndSwitchStorage().catch((error) => {
+    setSaveState('切换失败');
+    console.error(error);
+  });
+});
+
+elements.migrateStorageButton.addEventListener('click', () => {
+  migrateStorage().catch((error) => {
+    setSaveState('迁移失败');
+    console.error(error);
+  });
+});
+
+elements.settingsPanel.addEventListener('click', (event) => {
+  if (event.target === elements.settingsPanel) {
+    closeSettings();
+  }
+});
+
+elements.storageFolderList.addEventListener('click', (event) => {
+  const button = event.target.closest('.folder-switch-button');
+  if (!button || button.disabled) {
+    return;
+  }
+
+  switchStorage(button.dataset.folderPath).catch((error) => {
+    setSaveState('切换失败');
+    console.error(error);
+  });
 });
 
 elements.addColumnButton.addEventListener('click', addColumn);
@@ -358,6 +665,18 @@ elements.todoModeButton.addEventListener('click', () => {
 elements.itemTextInput.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     addItem();
+  }
+});
+
+elements.searchInput.addEventListener('input', () => {
+  editingItemId = null;
+  renderItems();
+});
+
+elements.searchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    elements.searchInput.value = '';
+    renderItems();
   }
 });
 
@@ -433,6 +752,12 @@ elements.itemList.addEventListener('click', (event) => {
     return;
   }
 
+  const result = event.target.closest('.search-result');
+  if (result) {
+    openSearchResult(result);
+    return;
+  }
+
   if (!event.target.classList.contains('delete-item-button')) {
     const preview = event.target.closest('.item-preview');
     if (preview) {
@@ -463,8 +788,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 api.loadStore().then((loaded) => {
-  store = loaded;
-  render();
+  applyLoadedData(loaded);
 }).catch((error) => {
   setSaveState('加载失败');
   console.error(error);

@@ -277,6 +277,29 @@ button {
   background: var(--accent-strong);
 }
 
+.search-bar {
+  padding: 10px 10px 0;
+  background: #fdfbf6;
+}
+
+.search-input {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 10px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #9ab4e8;
+  box-shadow: 0 0 0 2px rgba(45, 108, 223, 0.14);
+}
+
 .partition-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -393,6 +416,11 @@ button {
   background: #ffffff;
 }
 
+.note-item.highlighted {
+  border-color: #e0b84d;
+  box-shadow: 0 0 0 2px rgba(224, 184, 77, 0.22);
+}
+
 .note-type {
   display: grid;
   width: 24px;
@@ -479,6 +507,182 @@ button {
   height: 26px;
 }
 
+.settings-panel {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(34, 34, 34, 0.28);
+  z-index: 20;
+}
+
+.settings-panel[hidden] {
+  display: none;
+}
+
+.settings-card {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: var(--shadow);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.settings-subtitle {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-section {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-label {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.path-box {
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.folder-row.active {
+  border-color: #b8caf1;
+  background: #f8fbff;
+}
+
+.folder-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-switch-button:disabled {
+  cursor: default;
+  color: var(--muted);
+  background: #f2eee6;
+}
+
+.search-result {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  border-color: #b8caf1;
+  background: #f8fbff;
+}
+
+.search-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.search-type,
+.search-column {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.search-type {
+  color: var(--green);
+  background: #e7f3ec;
+}
+
+.search-result.todo .search-type {
+  color: var(--accent-strong);
+  background: #eaf1ff;
+}
+
+.search-column {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  background: #f2eee6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-preview {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 430px) {
   .workspace {
     grid-template-columns: 104px minmax(0, 1fr);
@@ -496,5 +700,9 @@ button {
   .text-button,
   .primary-button {
     padding: 0 8px;
+  }
+
+  .settings-actions {
+    flex-direction: column;
   }
 }
