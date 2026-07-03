@@ -277,6 +277,50 @@ button {
   background: var(--accent-strong);
 }
 
+.partition-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 10px 0;
+  background: #fdfbf6;
+}
+
+.partition-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.partition-tabs button.active {
+  color: #ffffff;
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.partition-count {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.partition-tabs button.active .partition-count {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .composer {
   padding: 10px;
   border-bottom: 1px solid var(--line);
@@ -311,28 +355,10 @@ button {
   margin-top: 8px;
 }
 
-.segmented {
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #ffffff;
-}
-
-.segmented button {
-  min-width: 54px;
-  height: 30px;
-  border: 0;
+.composer-label {
   color: var(--muted);
-  background: transparent;
   font-size: 12px;
   font-weight: 700;
-}
-
-.segmented button.active {
-  color: #ffffff;
-  background: var(--green);
 }
 
 .item-list {
@@ -391,14 +417,46 @@ button {
   accent-color: var(--green);
 }
 
+.item-body {
+  min-width: 0;
+}
+
+.item-preview,
 .item-text {
   width: 100%;
   min-height: 44px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.item-preview {
+  padding: 1px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.item-preview:focus {
+  outline: 1px solid #c4d3f4;
+  outline-offset: 4px;
+}
+
+.item-link {
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.item-link:hover {
+  color: var(--accent);
+}
+
+.item-text {
   resize: vertical;
   border: 0;
-  color: var(--text);
   background: transparent;
-  line-height: 1.45;
 }
 
 .item-text:focus {
@@ -406,9 +464,14 @@ button {
   outline-offset: 4px;
 }
 
+.note-item.completed .item-preview,
 .note-item.completed .item-text {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+.note-item.completed .item-link {
+  color: var(--muted);
 }
 
 .delete-item-button {

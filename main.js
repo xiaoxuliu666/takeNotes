@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -199,5 +199,19 @@ ipcMain.handle('window:minimize', () => {
 ipcMain.handle('window:close', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
+  }
+});
+
+ipcMain.handle('link:open', (_event, url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    shell.openExternal(parsed.toString());
+    return true;
+  } catch (_) {
+    return false;
   }
 });

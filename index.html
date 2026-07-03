@@ -40,13 +40,21 @@
             <button class="text-button danger" id="deleteColumnButton" type="button">删除栏目</button>
           </div>
 
+          <div class="partition-tabs" role="tablist" aria-label="内容分区">
+            <button id="noteModeButton" class="active" type="button" role="tab" aria-selected="true">
+              <span>笔记</span>
+              <span class="partition-count" id="noteCount">0</span>
+            </button>
+            <button id="todoModeButton" type="button" role="tab" aria-selected="false">
+              <span>待办</span>
+              <span class="partition-count" id="todoCount">0</span>
+            </button>
+          </div>
+
           <div class="composer">
-            <textarea id="itemTextInput" rows="3" maxlength="2000" placeholder="写笔记或待办..."></textarea>
+            <textarea id="itemTextInput" rows="3" maxlength="2000" placeholder="写笔记..."></textarea>
             <div class="composer-actions">
-              <div class="segmented" role="group" aria-label="内容类型">
-                <button id="noteModeButton" class="active" type="button">笔记</button>
-                <button id="todoModeButton" type="button">待办</button>
-              </div>
+              <div class="composer-label" id="composerLabel">新增笔记</div>
               <button class="primary-button" id="addItemButton" type="button">添加</button>
             </div>
           </div>

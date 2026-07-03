@@ -13,6 +13,9 @@ const elements = {
   itemTextInput: document.getElementById('itemTextInput'),
   noteModeButton: document.getElementById('noteModeButton'),
   todoModeButton: document.getElementById('todoModeButton'),
+  noteCount: document.getElementById('noteCount'),
+  todoCount: document.getElementById('todoCount'),
+  composerLabel: document.getElementById('composerLabel'),
   addItemButton: document.getElementById('addItemButton'),
   itemList: document.getElementById('itemList')
 };
@@ -20,6 +23,9 @@ const elements = {
 let store;
 let currentMode = 'note';
 let saveTimer;
+let editingItemId = null;
+
+const linkPattern = /https?:\/\/[^\s<>"']+/gi;
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -27,6 +33,54 @@ function uid(prefix) {
 
 function now() {
   return Date.now();
+}
+
+function trimLinkPunctuation(url) {
+  let cleanUrl = url;
+  let suffix = '';
+
+  while (/[),.;:!?，。；：！？）]$/.test(cleanUrl)) {
+    suffix = `${cleanUrl.slice(-1)}${suffix}`;
+    cleanUrl = cleanUrl.slice(0, -1);
+  }
+
+  return { cleanUrl, suffix };
+}
+
+function appendTextWithLinks(container, text) {
+  const value = text || '';
+  let lastIndex = 0;
+  linkPattern.lastIndex = 0;
+
+  for (const match of value.matchAll(linkPattern)) {
+    const rawUrl = match[0];
+    const start = match.index;
+    const { cleanUrl, suffix } = trimLinkPunctuation(rawUrl);
+
+    if (start > lastIndex) {
+      container.appendChild(document.createTextNode(value.slice(lastIndex, start)));
+    }
+
+    if (cleanUrl) {
+      const link = document.createElement('a');
+      link.className = 'item-link';
+      link.href = cleanUrl;
+      link.textContent = cleanUrl;
+      link.title = cleanUrl;
+      link.rel = 'noreferrer';
+      container.appendChild(link);
+    }
+
+    if (suffix) {
+      container.appendChild(document.createTextNode(suffix));
+    }
+
+    lastIndex = start + rawUrl.length;
+  }
+
+  if (lastIndex < value.length) {
+    container.appendChild(document.createTextNode(value.slice(lastIndex)));
+  }
 }
 
 function activeColumn() {
@@ -91,19 +145,22 @@ function renderColumns() {
 
 function renderItems() {
   const column = activeColumn();
+  const visibleItems = column.items.filter((item) => item.type === currentMode);
+  const sectionName = currentMode === 'todo' ? '待办' : '笔记';
+
   elements.columnNameInput.value = column.name || '';
   elements.deleteColumnButton.disabled = store.columns.length <= 1;
   elements.itemList.innerHTML = '';
 
-  if (!column.items.length) {
+  if (!visibleItems.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = '这个栏目还没有内容';
+    empty.textContent = `这个栏目还没有${sectionName}`;
     elements.itemList.appendChild(empty);
     return;
   }
 
-  column.items
+  visibleItems
     .slice()
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .forEach((item) => {
@@ -125,12 +182,25 @@ function renderItems() {
         row.appendChild(type);
       }
 
-      const text = document.createElement('textarea');
-      text.className = 'item-text';
-      text.value = item.text || '';
-      text.rows = Math.min(8, Math.max(2, Math.ceil((item.text || '').length / 28)));
-      text.maxLength = 2000;
-      text.ariaLabel = item.type === 'todo' ? '待办内容' : '笔记内容';
+      const body = document.createElement('div');
+      body.className = 'item-body';
+
+      if (editingItemId === item.id) {
+        const text = document.createElement('textarea');
+        text.className = 'item-text';
+        text.value = item.text || '';
+        text.rows = Math.min(8, Math.max(2, Math.ceil((item.text || '').length / 28)));
+        text.maxLength = 2000;
+        text.ariaLabel = item.type === 'todo' ? '待办内容' : '笔记内容';
+        body.appendChild(text);
+      } else {
+        const preview = document.createElement('div');
+        preview.className = 'item-preview';
+        preview.tabIndex = 0;
+        preview.title = '点击空白处编辑，点击链接跳转';
+        appendTextWithLinks(preview, item.text || '');
+        body.appendChild(preview);
+      }
 
       const del = document.createElement('button');
       del.className = 'icon-button danger delete-item-button';
@@ -139,14 +209,25 @@ function renderItems() {
       del.ariaLabel = '删除';
       del.textContent = 'X';
 
-      row.append(text, del);
+      row.append(body, del);
       elements.itemList.appendChild(row);
     });
 }
 
 function renderMode() {
-  elements.noteModeButton.classList.toggle('active', currentMode === 'note');
-  elements.todoModeButton.classList.toggle('active', currentMode === 'todo');
+  const column = activeColumn();
+  const noteCount = column.items.filter((item) => item.type === 'note').length;
+  const todoCount = column.items.filter((item) => item.type === 'todo').length;
+  const isNoteMode = currentMode === 'note';
+
+  elements.noteCount.textContent = String(noteCount);
+  elements.todoCount.textContent = String(todoCount);
+  elements.noteModeButton.classList.toggle('active', isNoteMode);
+  elements.todoModeButton.classList.toggle('active', !isNoteMode);
+  elements.noteModeButton.setAttribute('aria-selected', String(isNoteMode));
+  elements.todoModeButton.setAttribute('aria-selected', String(!isNoteMode));
+  elements.itemTextInput.placeholder = isNoteMode ? '写笔记...' : '写待办...';
+  elements.composerLabel.textContent = isNoteMode ? '新增笔记' : '新增待办';
 }
 
 function render() {
@@ -225,6 +306,19 @@ function findItem(itemId) {
   return column.items.find((item) => item.id === itemId);
 }
 
+function enterEditMode(itemId) {
+  editingItemId = itemId;
+  renderItems();
+
+  const row = elements.itemList.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
+  const text = row && row.querySelector('.item-text');
+  if (text) {
+    text.focus();
+    text.selectionStart = text.value.length;
+    text.selectionEnd = text.value.length;
+  }
+}
+
 elements.pinButton.addEventListener('click', () => {
   mutate(() => {
     store.settings.alwaysOnTop = !store.settings.alwaysOnTop;
@@ -251,12 +345,14 @@ elements.addItemButton.addEventListener('click', addItem);
 
 elements.noteModeButton.addEventListener('click', () => {
   currentMode = 'note';
-  renderMode();
+  editingItemId = null;
+  render();
 });
 
 elements.todoModeButton.addEventListener('click', () => {
   currentMode = 'todo';
-  renderMode();
+  editingItemId = null;
+  render();
 });
 
 elements.itemTextInput.addEventListener('keydown', (event) => {
@@ -300,6 +396,18 @@ elements.itemList.addEventListener('input', (event) => {
   scheduleSave();
 });
 
+elements.itemList.addEventListener('focusout', (event) => {
+  if (!event.target.classList.contains('item-text')) {
+    return;
+  }
+
+  const row = event.target.closest('.note-item');
+  if (row && editingItemId === row.dataset.itemId) {
+    editingItemId = null;
+    renderItems();
+  }
+});
+
 elements.itemList.addEventListener('change', (event) => {
   if (!event.target.classList.contains('todo-check')) {
     return;
@@ -318,7 +426,19 @@ elements.itemList.addEventListener('change', (event) => {
 });
 
 elements.itemList.addEventListener('click', (event) => {
+  const link = event.target.closest('.item-link');
+  if (link) {
+    event.preventDefault();
+    api.openLink(link.href);
+    return;
+  }
+
   if (!event.target.classList.contains('delete-item-button')) {
+    const preview = event.target.closest('.item-preview');
+    if (preview) {
+      const row = preview.closest('.note-item');
+      enterEditMode(row.dataset.itemId);
+    }
     return;
   }
 
