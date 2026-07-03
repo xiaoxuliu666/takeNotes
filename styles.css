@@ -492,6 +492,16 @@ button {
   outline-offset: 4px;
 }
 
+.item-time-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .note-item.completed .item-preview,
 .note-item.completed .item-text {
   color: var(--muted);

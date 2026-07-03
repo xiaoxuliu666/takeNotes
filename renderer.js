@@ -45,6 +45,36 @@ function now() {
   return Date.now();
 }
 
+function formatTimestamp(value) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return '未知';
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(timestamp));
+}
+
+function createItemTimeMeta(item) {
+  const meta = document.createElement('div');
+  meta.className = 'item-time-meta';
+
+  const created = document.createElement('span');
+  created.textContent = `创建：${formatTimestamp(item.createdAt)}`;
+
+  const updated = document.createElement('span');
+  updated.textContent = `修改：${formatTimestamp(item.updatedAt)}`;
+
+  meta.append(created, updated);
+  return meta;
+}
+
 function normalizeSearchText(value) {
   return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
@@ -381,6 +411,8 @@ function renderItems() {
         appendTextWithLinks(preview, item.text || '');
         body.appendChild(preview);
       }
+
+      body.appendChild(createItemTimeMeta(item));
 
       const del = document.createElement('button');
       del.className = 'icon-button danger delete-item-button';

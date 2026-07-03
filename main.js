@@ -176,6 +176,22 @@ function normalizeStore(store) {
   const columns = Array.isArray(rawStore.columns) && rawStore.columns.length > 0
     ? clone(rawStore.columns)
     : clone(defaultStore.columns);
+  const fallbackTime = Date.now();
+
+  columns.forEach((column) => {
+    if (!Array.isArray(column.items)) {
+      column.items = [];
+      return;
+    }
+
+    column.items.forEach((item) => {
+      const updatedAt = Number(item.updatedAt);
+      const createdAt = Number(item.createdAt);
+
+      item.updatedAt = Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : fallbackTime;
+      item.createdAt = Number.isFinite(createdAt) && createdAt > 0 ? createdAt : item.updatedAt;
+    });
+  });
 
   return {
     version: 1,
