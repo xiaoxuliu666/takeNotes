@@ -158,8 +158,22 @@ function trimLinkPunctuation(url) {
   let cleanUrl = url;
   let suffix = '';
 
-  while (/[),.;:!?，。；：！？）]$/.test(cleanUrl)) {
-    suffix = `${cleanUrl.slice(-1)}${suffix}`;
+  while (cleanUrl) {
+    const trailingChar = cleanUrl.slice(-1);
+
+    if (trailingChar === ')' || trailingChar === '）') {
+      const openingChar = trailingChar === ')' ? '(' : '（';
+      const openingCount = (cleanUrl.match(new RegExp(`\\${openingChar}`, 'g')) || []).length;
+      const closingCount = (cleanUrl.match(new RegExp(`\\${trailingChar}`, 'g')) || []).length;
+
+      if (closingCount <= openingCount) {
+        break;
+      }
+    } else if (!/[,.;:!?，。；：！？]$/.test(cleanUrl)) {
+      break;
+    }
+
+    suffix = `${trailingChar}${suffix}`;
     cleanUrl = cleanUrl.slice(0, -1);
   }
 
