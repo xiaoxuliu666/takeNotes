@@ -34,6 +34,8 @@ let currentMode = 'note';
 let saveTimer;
 let editingItemId = null;
 let highlightedItemId = null;
+let draggedColumnId = null;
+let suppressColumnClick = false;
 
 const linkPattern = /https?:\/\/[^\s<>"']+/gi;
 
@@ -305,6 +307,8 @@ function renderColumns() {
     button.className = `column-item${column.id === selected.id ? ' active' : ''}`;
     button.type = 'button';
     button.dataset.columnId = column.id;
+    button.draggable = true;
+    button.title = '拖拽可调整栏目顺序';
 
     const label = document.createElement('span');
     label.className = 'column-label';
@@ -727,6 +731,11 @@ elements.searchInput.addEventListener('keydown', (event) => {
 });
 
 elements.columnList.addEventListener('click', (event) => {
+  if (suppressColumnClick) {
+    suppressColumnClick = false;
+    return;
+  }
+
   const button = event.target.closest('.column-item');
   if (!button) {
     return;
@@ -735,6 +744,72 @@ elements.columnList.addEventListener('click', (event) => {
   mutate(() => {
     store.settings.activeColumnId = button.dataset.columnId;
   });
+});
+
+elements.columnList.addEventListener('dragstart', (event) => {
+  const button = event.target.closest('.column-item');
+  if (!button) {
+    return;
+  }
+
+  draggedColumnId = button.dataset.columnId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', draggedColumnId);
+  requestAnimationFrame(() => button.classList.add('dragging'));
+});
+
+elements.columnList.addEventListener('dragover', (event) => {
+  if (!draggedColumnId) {
+    return;
+  }
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+
+  const target = event.target.closest('.column-item');
+  elements.columnList.querySelectorAll('.column-item').forEach((item) => {
+    item.classList.remove('drop-before', 'drop-after');
+  });
+
+  if (!target || target.dataset.columnId === draggedColumnId) {
+    return;
+  }
+
+  const isAfter = event.clientY > target.getBoundingClientRect().top + target.offsetHeight / 2;
+  target.classList.add(isAfter ? 'drop-after' : 'drop-before');
+});
+
+elements.columnList.addEventListener('drop', (event) => {
+  if (!draggedColumnId) {
+    return;
+  }
+
+  event.preventDefault();
+  const target = event.target.closest('.column-item');
+  if (!target || target.dataset.columnId === draggedColumnId) {
+    return;
+  }
+
+  const targetId = target.dataset.columnId;
+  const placeAfter = event.clientY > target.getBoundingClientRect().top + target.offsetHeight / 2;
+
+  mutate(() => {
+    const sourceIndex = store.columns.findIndex((column) => column.id === draggedColumnId);
+    const [movedColumn] = store.columns.splice(sourceIndex, 1);
+    const targetIndex = store.columns.findIndex((column) => column.id === targetId);
+    store.columns.splice(targetIndex + (placeAfter ? 1 : 0), 0, movedColumn);
+  });
+});
+
+elements.columnList.addEventListener('dragend', () => {
+  draggedColumnId = null;
+  suppressColumnClick = true;
+  elements.columnList.querySelectorAll('.column-item').forEach((item) => {
+    item.classList.remove('dragging', 'drop-before', 'drop-after');
+  });
+  setTimeout(() => {
+    suppressColumnClick = false;
+  }, 0);
 });
 
 elements.columnNameInput.addEventListener('input', () => {

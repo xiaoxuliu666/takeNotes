@@ -170,6 +170,7 @@ button {
 }
 
 .column-item {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -182,6 +183,36 @@ button {
   color: var(--text);
   background: transparent;
   text-align: left;
+  cursor: grab;
+  user-select: none;
+}
+
+.column-item:active {
+  cursor: grabbing;
+}
+
+.column-item.dragging {
+  opacity: 0.35;
+}
+
+.column-item.drop-before::before,
+.column-item.drop-after::after {
+  position: absolute;
+  right: 4px;
+  left: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  content: '';
+  pointer-events: none;
+}
+
+.column-item.drop-before::before {
+  top: -3px;
+}
+
+.column-item.drop-after::after {
+  bottom: -3px;
 }
 
 .column-item:hover,
