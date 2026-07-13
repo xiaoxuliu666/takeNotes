@@ -538,12 +538,19 @@ function findItem(itemId) {
 }
 
 function enterEditMode(itemId) {
+  const previewRow = elements.itemList.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
+  const preview = previewRow && previewRow.querySelector('.item-preview');
+  const previewRowHeight = previewRow ? previewRow.getBoundingClientRect().height : 0;
+  const previewHeight = preview ? preview.getBoundingClientRect().height : 0;
+
   editingItemId = itemId;
   renderItems();
 
   const row = elements.itemList.querySelector(`[data-item-id="${CSS.escape(itemId)}"]`);
   const text = row && row.querySelector('.item-text');
   if (text) {
+    text.style.minHeight = `${previewHeight}px`;
+    row.style.minHeight = `${previewRowHeight}px`;
     text.focus();
     text.selectionStart = text.value.length;
     text.selectionEnd = text.value.length;
